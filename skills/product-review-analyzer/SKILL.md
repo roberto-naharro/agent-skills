@@ -1,6 +1,6 @@
 ---
 name: product-review-analyzer
-description: Use when asked to evaluate, analyze, or review a product. Searches for user reviews in Spanish and English, accepts manually pasted reviews from Amazon or other platforms, filters fake/promotional/AI-generated reviews using a research-backed rubric, and produces a 0–10 score with a structured pros/cons summary.
+description: Use when asked to evaluate a product. Collects user reviews in Spanish/English, filters fake/promotional/AI-generated content using research signals, and produces a 0–10 score with pros/cons summary.
 ---
 
 # Product Review Analyzer
