@@ -73,7 +73,7 @@ Different platforms have different levels of accessibility for autonomous scrapi
 |----------|--------------|-------|
 | Reddit | ✅ High | Threads are fully indexable; search for product name + subreddit |
 | Xataka / GSMArena / PCMag | ✅ High | Indexed by search engines |
-| Amazon (web search) | ⚠️ Partial | Top reviews surface via Google; deep pagination blocked |
+| Amazon (web search) | ⚠️ Partial | Only top-ranked reviews surface via Google; deep pagination and recency-sorted results are blocked. **Visibility bias**: the sample is skewed toward reviews that Amazon's algorithm already considers "most helpful", which may not be representative of the overall distribution. |
 | Amazon (direct) | ❌ Blocked | Anti-bot measures prevent systematic scraping |
 | El Corte Inglés / FNAC | ⚠️ Partial | Some reviews indexable via Google |
 | Trustpilot / Google Reviews | ✅ High | Indexable |
@@ -126,7 +126,13 @@ Non-`genuine-candidate` reviews are automatically labeled `discard`.
 ## Phase 3 — Sentiment Scoring
 
 For each non-discarded review, assign a `sentiment_score` from **-5 to +5** based on
-actual content — ignore the original star rating entirely:
+actual content — ignore the original star rating entirely.
+
+**Scoring rules:**
+- Always assign a numeric score. Use `0` for genuinely neutral or ambiguous reviews.
+  Reserve `null` exclusively for discarded reviews (type `discard`/`promo`/etc.).
+- Limit `key_points` to a maximum of **3 items** per review, keeping only the most
+  distinctive points. Use an empty array `[]` only for discarded reviews.
 
 | Score | Description |
 |-------|-------------|
@@ -239,6 +245,7 @@ if total reviews < 10). Separate positive from negative.
 ### ⚠️ Advertencias
 - [si confianza Baja: "Menos de 7 reseñas genuinas — resultado poco fiable"]
 - [si todas las fuentes son de una sola plataforma: "Sesgo de fuente única"]
+- [si la mayoría de reseñas de Amazon proceden de búsqueda web: "Sesgo de visibilidad: solo se analizaron las reseñas más relevantes según el algoritmo de Amazon, no una muestra representativa"]
 - [si el producto es reciente: "Pocas reseñas disponibles — se recomienda revisión manual"]
 ```
 

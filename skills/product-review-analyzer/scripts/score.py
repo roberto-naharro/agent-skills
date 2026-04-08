@@ -37,7 +37,24 @@ def compute_score(reviews: list[dict]) -> dict:
             "total_reviews": len(reviews),
         }
 
-    scorable = [r for r in valid if r.get("sentiment_score") is not None]
+    scorable = []
+    for r in valid:
+        score = r.get("sentiment_score")
+        if score is None:
+            continue
+        if not isinstance(score, (int, float)) or score < -5 or score > 5:
+            print(
+                json.dumps(
+                    {
+                        "warning": f"Skipping review with out-of-range sentiment_score: {score!r}",
+                        "source": r.get("source", "unknown"),
+                    },
+                    ensure_ascii=False,
+                ),
+                file=sys.stderr,
+            )
+            continue
+        scorable.append(r)
 
     if not scorable:
         return {
