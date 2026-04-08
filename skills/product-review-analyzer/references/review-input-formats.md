@@ -192,6 +192,50 @@ to the internal representation used by the skill.
 
 ---
 
+---
+
+## Option 5 — Amazon app copy-paste (script-assisted)
+
+Amazon's website limits review access to ~10 results, but the Amazon **mobile or
+desktop app** lets you scroll through and copy-paste many more reviews as plain text.
+Use `scripts/parse_amazon_paste.py` to convert that paste into structured JSON (Option 4).
+
+### Steps
+
+1. Open the product page in the Amazon app.
+2. Tap **See all reviews** and scroll to load as many reviews as you need.
+3. Select all the visible text and copy it.
+4. Paste into a plain text file (e.g. `reviews.txt`).
+5. Run the parser:
+
+```bash
+python scripts/parse_amazon_paste.py reviews.txt -o reviews.json
+```
+
+6. Paste the contents of `reviews.json` into the conversation with Claude (or pass it
+   directly to `scripts/score.py` after the skill has classified the reviews).
+
+### What the script extracts
+
+| Field | Notes |
+|-------|-------|
+| `reviewer` | Name as shown in the app |
+| `rating` | 1–5 stars (parsed from "X,X de 5 estrellas") |
+| `verified` | `true` if "Compra verificada" / "Verified Purchase" is present |
+| `date` | ISO 8601 (e.g. `2026-04-02`) |
+| `source` | Derived from "Reseñado en [country]" (e.g. `Amazon ES`) |
+| `text` | Full body text; video-timestamp noise and UI chrome are stripped |
+| `title` | Review title (preserved as metadata) |
+| `helpful_votes` | Number of helpful votes when present |
+| `truncated` | `true` when the app truncated the text with "Ver más" |
+
+> **Note on truncated reviews:** the app cuts long reviews at "Ver más". The parsed
+> text is still useful for sentiment analysis; `"truncated": true` is included so the
+> skill can note the limitation. For complete text, use the SingleFile HTML method
+> (Option 0).
+
+---
+
 ## Tips for best results
 
 - **More reviews = higher confidence.** Aim for at least 15 reviews when possible.
@@ -203,3 +247,4 @@ to the internal representation used by the skill.
   independently, the original rating helps calibrate the analysis.
 - **For Amazon, use SingleFile on different star filters.** Save one HTML page for
   "All reviews", one for "1-star", and one for "5-star" to get a representative sample.
+

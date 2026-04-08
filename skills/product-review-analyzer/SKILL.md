@@ -24,6 +24,9 @@ The user may provide reviews in any of these forms (see
   Claude parses review containers, star ratings, verified-purchase badges, and dates
   directly from the HTML. Multiple files (one per star-filter or page) are accepted
   and deduplicated automatically.
+- **Amazon app copy-paste + script** *(Option 5)*: user copies text directly from the
+  Amazon app (which bypasses the 10-review web limit) and runs
+  `scripts/parse_amazon_paste.py` to convert it to JSON before pasting here.
 - **Plain paste**: raw text from any platform, one review per block separated by `---`.
 - **Labeled paste**: each review preceded by `[★4 | Amazon ES | verified]`.
 - **CSV/TSV**: columns `rating,source,verified,text` (from browser extensions).
