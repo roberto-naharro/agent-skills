@@ -1,0 +1,50 @@
+name: Package skills as ZIPs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "skills/**"
+  workflow_dispatch:
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create ZIPs for each skill
+        run: |
+          mkdir -p dist
+          for skill_dir in skills/*/; do
+            skill_name=$(basename "$skill_dir")
+            zip -r "dist/${skill_name}.zip" "$skill_dir"
+            echo "Packaged: ${skill_name}.zip"
+          done
+
+      - name: Upload ZIPs as workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: skills-zips
+          path: dist/*.zip
+          retention-days: 90
+
+      - name: Update release with ZIPs
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: skills-latest
+          name: "Skills (latest)"
+          body: |
+            ZIPs actualizados automáticamente al hacer push a `main`.
+
+            ## Cómo instalar una skill en Claude
+            1. Descarga el ZIP de la skill que quieras.
+            2. Ve a [claude.ai/customize/skills](https://claude.ai/customize/skills).
+            3. Pulsa **+** → **Create skill** → **Upload a skill**.
+            4. Selecciona el ZIP descargado.
+          files: dist/*.zip
+          make_latest: true
