@@ -24,10 +24,33 @@ WEIGHTS: dict[str, float] = {
 
 CONFIDENCE_THRESHOLDS = {"alta": 15, "media": 7}
 
+# Labels that are intentionally discarded and should not trigger a warning
+EXPECTED_DISCARD_LABELS: frozenset[str | None] = frozenset({"discard", "promo", None})
+
+SENTIMENT_SCORE_MIN = -5
+SENTIMENT_SCORE_MAX = 5
+
 
 def compute_score(reviews: list[dict]) -> dict:
-    valid = [r for r in reviews if r.get("reliability") in WEIGHTS]
-    discarded = [r for r in reviews if r.get("reliability") not in WEIGHTS]
+    valid = []
+    discarded = []
+    for r in reviews:
+        if r.get("reliability") in WEIGHTS:
+            valid.append(r)
+        else:
+            label = r.get("reliability")
+            if label not in EXPECTED_DISCARD_LABELS:
+                print(
+                    json.dumps(
+                        {
+                            "warning": f"Unrecognized reliability label '{label}' — review discarded.",
+                            "source": r.get("source", "unknown"),
+                        },
+                        ensure_ascii=False,
+                    ),
+                    file=sys.stderr,
+                )
+            discarded.append(r)
 
     if not valid:
         return {
@@ -37,7 +60,24 @@ def compute_score(reviews: list[dict]) -> dict:
             "total_reviews": len(reviews),
         }
 
-    scorable = [r for r in valid if r.get("sentiment_score") is not None]
+    scorable = []
+    for r in valid:
+        score = r.get("sentiment_score")
+        if score is None:
+            continue
+        if not isinstance(score, (int, float)) or score < SENTIMENT_SCORE_MIN or score > SENTIMENT_SCORE_MAX:
+            print(
+                json.dumps(
+                    {
+                        "warning": f"Skipping review with out-of-range sentiment_score: {score!r}",
+                        "source": r.get("source", "unknown"),
+                    },
+                    ensure_ascii=False,
+                ),
+                file=sys.stderr,
+            )
+            continue
+        scorable.append(r)
 
     if not scorable:
         return {

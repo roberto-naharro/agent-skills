@@ -24,6 +24,9 @@ The user may provide reviews in any of these forms (see
   Claude parses review containers, star ratings, verified-purchase badges, and dates
   directly from the HTML. Multiple files (one per star-filter or page) are accepted
   and deduplicated automatically.
+- **Amazon app copy-paste + script** *(Option 5)*: user copies text directly from the
+  Amazon app (which bypasses the 10-review web limit) and runs
+  `scripts/parse_amazon_paste.py` to convert it to JSON before pasting here.
 - **Plain paste**: raw text from any platform, one review per block separated by `---`.
 - **Labeled paste**: each review preceded by `[★4 | Amazon ES | verified]`.
 - **CSV/TSV**: columns `rating,source,verified,text` (from browser extensions).
@@ -73,11 +76,16 @@ Different platforms have different levels of accessibility for autonomous scrapi
 |----------|--------------|-------|
 | Reddit | ✅ High | Threads are fully indexable; search for product name + subreddit |
 | Xataka / GSMArena / PCMag | ✅ High | Indexed by search engines |
-| Amazon (web search) | ⚠️ Partial | Top reviews surface via Google; deep pagination blocked |
+| Amazon (web search) | ⚠️ Partial | Only top-ranked reviews surface via Google; deep pagination and recency-sorted results are blocked. See note below. |
 | Amazon (direct) | ❌ Blocked | Anti-bot measures prevent systematic scraping |
 | El Corte Inglés / FNAC | ⚠️ Partial | Some reviews indexable via Google |
 | Trustpilot / Google Reviews | ✅ High | Indexable |
 | YouTube comments | ❌ Not accessible | Requires API |
+
+> **⚠️ Visibility bias (Amazon web search):** The sample is skewed toward reviews that
+> Amazon's algorithm already considers "most helpful", which may not be representative
+> of the full distribution. Recent reviews, low-vote reviews, and minority-opinion
+> reviews are systematically under-sampled.
 
 **If web search yields fewer than 10 reviews**: inform the user and suggest they
 provide reviews manually using the paste methods described in Phase 0 and in
@@ -120,13 +128,23 @@ Non-`genuine-candidate` reviews are automatically labeled `discard`.
   pattern). Do not treat negativity as a signal of authenticity.
 - When in doubt between `suspicious` and `genuine`, prefer `suspicious` (included at
   reduced weight) over `discard` (excluded entirely).
+- **Anti-complacency**: the proportion of positive reviews in the dataset must NOT
+  relax classification criteria. Apply the same signal thresholds regardless of whether
+  the overall sentiment is positive or negative. A high ratio of 5-star reviews is
+  itself a signal worth noting, not a reason to lower scrutiny.
 
 ---
 
 ## Phase 3 — Sentiment Scoring
 
 For each non-discarded review, assign a `sentiment_score` from **-5 to +5** based on
-actual content — ignore the original star rating entirely:
+actual content — ignore the original star rating entirely.
+
+**Scoring rules:**
+- Always assign a numeric score. Use `0` for genuinely neutral or ambiguous reviews.
+  Reserve `null` exclusively for discarded reviews (type `discard`/`promo`/etc.).
+- Limit `key_points` to a maximum of **3 items** per review, keeping only the most
+  distinctive points. Use an empty array `[]` only for discarded reviews.
 
 | Score | Description |
 |-------|-------------|
@@ -209,6 +227,13 @@ From the `key_points` fields of all non-discarded reviews, group by theme and co
 independent mentions. Report only points that appear in ≥2 independent sources (or 1
 if total reviews < 10). Separate positive from negative.
 
+**Semantic deduplication:** before counting, cluster synonymous points under a single
+canonical label. Examples: "batería duradera", "buena autonomía", and "battery lasts
+long" are the same cluster → merge and count combined. "pantalla brillante" and
+"display brightness" are the same cluster → merge. Use the most descriptive phrasing
+as the canonical label. Only split into separate items when the points refer to
+genuinely distinct product attributes.
+
 ---
 
 ## Phase 6 — Output Format
@@ -239,6 +264,7 @@ if total reviews < 10). Separate positive from negative.
 ### ⚠️ Advertencias
 - [si confianza Baja: "Menos de 7 reseñas genuinas — resultado poco fiable"]
 - [si todas las fuentes son de una sola plataforma: "Sesgo de fuente única"]
+- [si la mayoría de reseñas de Amazon proceden de búsqueda web: "Sesgo de visibilidad en Amazon: muestra limitada a reseñas destacadas por el algoritmo, no representativa del total"]
 - [si el producto es reciente: "Pocas reseñas disponibles — se recomienda revisión manual"]
 ```
 
