@@ -163,7 +163,10 @@ def _parse_date_es(line: str) -> tuple[str | None, str | None]:
     month = _MONTHS_ES.get(month_name)
     if not month:
         return None, None
-    date_str = date(year, month, day).isoformat()
+    try:
+        date_str = date(year, month, day).isoformat()
+    except ValueError:
+        return None, None
     source = _COUNTRY_SOURCE.get(country_raw, f"Amazon ({m.group(1).strip()})")
     return date_str, source
 
@@ -177,7 +180,10 @@ def _parse_date_en(line: str) -> tuple[str | None, str | None]:
     month = _MONTHS_EN.get(month_name)
     if not month:
         return None, None
-    date_str = date(year, month, day).isoformat()
+    try:
+        date_str = date(year, month, day).isoformat()
+    except ValueError:
+        return None, None
     source = _COUNTRY_SOURCE.get(country_raw, f"Amazon ({m.group(1).strip()})")
     return date_str, source
 
