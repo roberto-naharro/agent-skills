@@ -60,6 +60,14 @@ content.
 Simply copy and paste reviews from any platform. Separate each review with a line
 containing only `---`.
 
+> **⚠️ Precision note:** Plain paste strips almost all reliability metadata — date,
+> reviewer profile, verified-purchase badge, and platform source are lost. The skill
+> must rely exclusively on linguistic signals, which are the easiest to manipulate.
+> This significantly reduces classification accuracy compared to structured formats.
+> Use this option only when no richer format is available. If precision matters,
+> upgrade to Option 2 (labeled paste) by prepending a header like
+> `[★4 | Amazon ES | verified]` to each review block (see Option 2 below).
+
 ### Example
 
 ```

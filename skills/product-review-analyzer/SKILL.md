@@ -261,7 +261,7 @@ genuinely distinct product attributes.
 ### ⚠️ Advertencias
 - [si confianza Baja: "Menos de 7 reseñas genuinas — resultado poco fiable"]
 - [si todas las fuentes son de una sola plataforma: "Sesgo de fuente única"]
-- [si la mayoría de reseñas de Amazon proceden de búsqueda web: "Sesgo de visibilidad: solo se analizaron las reseñas más relevantes según el algoritmo de Amazon, no una muestra representativa"]
+- [si la mayoría de reseñas de Amazon proceden de búsqueda web: "Sesgo de visibilidad en Amazon: muestra limitada a reseñas destacadas por el algoritmo, no representativa del total"]
 - [si el producto es reciente: "Pocas reseñas disponibles — se recomienda revisión manual"]
 ```
 

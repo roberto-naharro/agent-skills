@@ -101,6 +101,18 @@ repetitive structural patterns** (Jansen et al. 2025; MAiDE-up 2024; ScienceDire
 - **High rating + low-reputation profile**: 5-star review from an account with few
   reviews, low helpful-vote count, and recently created (visible on Amazon).
 
+> **⚠️ Endogamy-risk guard:** An LLM evaluating another LLM's output is prone to
+> over-flagging well-written human text. Apply these mitigations:
+>
+> - **"Specificity gap" is not a standalone signal.** A meticulously written review
+>   that is fluent and well-structured must not be labelled `ai_generated` on that
+>   basis alone. Require at least one additional corroborating signal.
+> - **Structure is not proof.** Careful human reviewers do write in clear, organised
+>   prose. Only treat structure as a signal when combined with absence of any
+>   first-person experiential grounding.
+> - **The 2-signal threshold is a floor, not a target.** When in doubt, prefer
+>   `suspicious` (weight 0.5) over `ai_generated` (weight 0.25).
+
 > Note: AI-generated reviews are included at reduced weight (0.25) rather than
 > discarded, because detection is probabilistic and a legitimate review could match
 > some of these patterns.

@@ -43,7 +43,7 @@ def compute_score(reviews: list[dict]) -> dict:
                 print(
                     json.dumps(
                         {
-                            "warning": f"Unrecognised reliability label '{label}' — review discarded.",
+                            "warning": f"Unrecognized reliability label '{label}' — review discarded.",
                             "source": r.get("source", "unknown"),
                         },
                         ensure_ascii=False,
