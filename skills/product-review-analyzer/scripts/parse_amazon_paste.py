@@ -144,10 +144,22 @@ _NOMBRE_ESTILO_RE = re.compile(
 )
 
 # Split point between a lowercase-ending variant value and an uppercase-starting body.
-# Example: "recambiosEl artículo" → split between 's' and 'E'
+# Assumption: Amazon variant descriptors (e.g. "Starter set + 6 recambios") end with a
+# lowercase letter, while body text starts with a capitalised word (e.g. "El artículo",
+# "La mejor", "Para mi"). The heuristic therefore splits at the first lowercase→uppercase
+# transition inside the post-date segment.
+# Known limitation: if a variant name ends with an uppercase letter (e.g. an
+# acronym like "USB") or if the body begins with a lowercase word, the split will be
+# incorrect. In those rare cases the variant and body text are merged, which is
+# acceptable — the skill only strictly requires the `text` field.
 _LOWER_UPPER_BOUNDARY_RE = re.compile(
     r"(?<=[a-záéíóúüñ])(?=[A-ZÁÉÍÓÚÜÑ])"
 )
+
+# A date line is considered "compact" (Format B) when the line is longer than the date
+# match itself plus this many extra characters.  The threshold accounts for small amounts
+# of surrounding whitespace while still catching lines that contain nothing but the date.
+_COMPACT_EXTRA_CHARS = 5
 
 
 # ---------------------------------------------------------------------------
@@ -327,9 +339,13 @@ def _parse_block(raw_block: str) -> dict | None:
     # --- 1b. Detect compact format (Format B) --------------------------------
     # In Format B the date is embedded in a longer line that also holds the
     # verified badge, title, variant, and body — all without newlines between them.
+    # We consider a line "compact" when it contains more than just the date match
+    # itself plus a small amount of surrounding whitespace.  The threshold of
+    # _COMPACT_EXTRA_CHARS characters gives enough room for leading/trailing spaces
+    # while still catching lines that only contain the date.
     date_line_stripped = lines[date_idx].strip()
     compact_extra: dict = {}
-    is_compact = len(date_line_stripped) > (date_match_obj.end() - date_match_obj.start() + 5)
+    is_compact = len(date_line_stripped) > (date_match_obj.end() - date_match_obj.start() + _COMPACT_EXTRA_CHARS)
     if is_compact:
         compact_extra = _extract_compact_date_line(date_line_stripped, date_match_obj)
 
