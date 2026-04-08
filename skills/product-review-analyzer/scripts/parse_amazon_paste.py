@@ -114,7 +114,8 @@ _NOISE_LINE_RE = re.compile(
 
 # Variant/attribute line just after the date (Color: Negro, Talla: M, …)
 _VARIANT_RE = re.compile(
-    r"^(Color|Talla|Tama[ñn]o|Size|Style|Estilo|Configuraci[oó]n|Modelo|Model)\s*:",
+    r"^(Color|Talla|Tama[ñn]o|Size|Style|Estilo|Configuraci[oó]n|Modelo|Model"
+    r"|Nombre de estilo)\s*:",
     re.IGNORECASE,
 )
 
@@ -128,11 +129,24 @@ _HEADER_NOISE_RE = re.compile(
     r"|^Escribir una opini[oó]n$"
     r"|^Ordenar por tipo de rese[ñn]a$"
     r"|^M[aá]s recientes$"
+    r"|^Rese[ñn]as m[aá]s importantes.*$"
     r"|^Filtro »$"
     r"|^\d[\d.,]* rese[ñn]as de clientes$"
     r"|^Traducido por Amazon$"
     r"|^C[oó]mo funcionan las opiniones.*$",
     re.IGNORECASE,
+)
+
+# Inline "Nombre de estilo: VARIANT" prefix in compact-format date lines
+_NOMBRE_ESTILO_RE = re.compile(
+    r"Nombre de estilo:\s*",
+    re.IGNORECASE,
+)
+
+# Split point between a lowercase-ending variant value and an uppercase-starting body.
+# Example: "recambiosEl artículo" → split between 's' and 'E'
+_LOWER_UPPER_BOUNDARY_RE = re.compile(
+    r"(?<=[a-záéíóúüñ])(?=[A-ZÁÉÍÓÚÜÑ])"
 )
 
 
@@ -198,6 +212,57 @@ def _parse_helpful(line: str) -> int | None:
     return int(raw)
 
 
+def _extract_compact_date_line(line: str, date_match: re.Match) -> dict:
+    """Extract fields from a compact date line (Format B).
+
+    Format B concatenates all review metadata onto a single line:
+        [Compra verificada][TITLE]Reseñado en COUNTRY el DATE[Nombre de estilo: VARIANT][BODY]
+
+    Returns a dict with zero or more of: verified, title, variant, body, helpful_votes.
+    """
+    result: dict = {}
+
+    # --- Pre-date segment: [Compra verificada][TITLE] ------------------------
+    pre = line[: date_match.start()].strip()
+    if pre.lower().startswith("compra verificada"):
+        result["verified"] = True
+        pre = pre[len("compra verificada") :].strip()
+    elif pre.lower().startswith("verified purchase"):
+        result["verified"] = True
+        pre = pre[len("verified purchase") :].strip()
+    else:
+        result["verified"] = False
+
+    if pre:
+        result["title"] = pre
+
+    # --- Post-date segment: [Nombre de estilo: VARIANT][BODY][helpful_votes] -
+    post = line[date_match.end() :].strip()
+    if not post:
+        return result
+
+    m_variant = _NOMBRE_ESTILO_RE.match(post)
+    if m_variant:
+        rest = post[m_variant.end() :]
+        # Split at the first camelCase boundary: lowercase→uppercase
+        # e.g. "recambiosEl artículo" → ["recambios", "El artículo"]
+        parts = _LOWER_UPPER_BOUNDARY_RE.split(rest, maxsplit=1)
+        result["variant"] = parts[0].strip()
+        post = parts[1].strip() if len(parts) == 2 else ""
+
+    if not post:
+        return result
+
+    # Check if what remains is a helpful-votes note
+    hv = _parse_helpful(post)
+    if hv is not None:
+        result["helpful_votes"] = hv
+    else:
+        result["body"] = post
+
+    return result
+
+
 # ---------------------------------------------------------------------------
 # Block parser
 # ---------------------------------------------------------------------------
@@ -219,25 +284,59 @@ def _parse_block(raw_block: str) -> dict | None:
     date_idx: int | None = None
     review_date: str | None = None
     review_source: str | None = None
+    date_match_obj: re.Match | None = None  # the regex match on the date line
 
     for i, line in enumerate(lines):
         stripped = line.strip()
-        d, s = _parse_date_es(stripped)
-        if not d:
-            d, s = _parse_date_en(stripped)
-        if d:
-            date_idx = i
-            review_date = d
-            review_source = s
-            break
+        m = _DATE_ES_RE.search(stripped)
+        if m:
+            try:
+                month = _MONTHS_ES.get(m.group(3).strip().lower())
+                if month:
+                    d = date(int(m.group(4)), month, int(m.group(2))).isoformat()
+                    review_date = d
+                    review_source = _COUNTRY_SOURCE.get(
+                        m.group(1).strip().lower(),
+                        f"Amazon ({m.group(1).strip()})",
+                    )
+                    date_idx = i
+                    date_match_obj = m
+                    break
+            except ValueError:
+                pass
+        m = _DATE_EN_RE.search(stripped)
+        if m:
+            try:
+                month = _MONTHS_EN.get(m.group(2).strip().lower())
+                if month:
+                    d = date(int(m.group(4)), month, int(m.group(3))).isoformat()
+                    review_date = d
+                    review_source = _COUNTRY_SOURCE.get(
+                        m.group(1).strip().lower(),
+                        f"Amazon ({m.group(1).strip()})",
+                    )
+                    date_idx = i
+                    date_match_obj = m
+                    break
+            except ValueError:
+                pass
 
     if date_idx is None:
         return None  # no date line → no review in this block
 
+    # --- 1b. Detect compact format (Format B) --------------------------------
+    # In Format B the date is embedded in a longer line that also holds the
+    # verified badge, title, variant, and body — all without newlines between them.
+    date_line_stripped = lines[date_idx].strip()
+    compact_extra: dict = {}
+    is_compact = len(date_line_stripped) > (date_match_obj.end() - date_match_obj.start() + 5)
+    if is_compact:
+        compact_extra = _extract_compact_date_line(date_line_stripped, date_match_obj)
+
     # --- 2. Find rating line by scanning backwards from the date line --------
     rating_idx: int | None = None
     review_rating: int | None = None
-    review_verified = False
+    review_verified = compact_extra.get("verified", False)
 
     for i in range(date_idx - 1, -1, -1):
         stripped = lines[i].strip()
@@ -247,10 +346,13 @@ def _parse_block(raw_block: str) -> dict | None:
         if r is not None:
             rating_idx = i
             review_rating = r
-            review_verified = (
-                "compra verificada" in stripped.lower()
-                or "verified purchase" in stripped.lower()
-            )
+            # In Format A the verified badge is on the rating line; in Format B
+            # it was already extracted from the compact date line above.
+            if not is_compact:
+                review_verified = (
+                    "compra verificada" in stripped.lower()
+                    or "verified purchase" in stripped.lower()
+                )
             break
 
     # --- 3. Find reviewer name: non-empty, non-noise line just before rating --
@@ -263,18 +365,23 @@ def _parse_block(raw_block: str) -> dict | None:
                 break
 
     # --- 4. Find review title: between rating line and date line -------------
-    title: str | None = None
-    if rating_idx is not None:
+    # In Format B the title comes from the compact line extraction.
+    title: str | None = compact_extra.get("title")
+    if title is None and rating_idx is not None:
         for i in range(rating_idx + 1, date_idx):
             stripped = lines[i].strip()
             if stripped and not _HEADER_NOISE_RE.match(stripped) and not _NOISE_LINE_RE.match(stripped):
                 title = stripped
                 break
 
-    # --- 5. Collect body text: lines after the date line ---------------------
+    # --- 5. Collect body text ------------------------------------------------
+    # Seed with body already extracted from the compact date line (if any).
     body_lines: list[str] = []
-    helpful_votes: int | None = None
-    first_body_line = True
+    if compact_extra.get("body"):
+        body_lines.append(compact_extra["body"])
+
+    helpful_votes: int | None = compact_extra.get("helpful_votes")
+    first_body_line = not bool(body_lines)
 
     for i in range(date_idx + 1, len(lines)):
         stripped = lines[i].strip()
